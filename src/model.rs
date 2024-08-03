@@ -1,4 +1,4 @@
-use std::{borrow::Cow, future::Future, str::FromStr};
+use std::{borrow::Cow, str::FromStr};
 
 use anyhow::Context;
 use postgres_protocol::message::backend::{Tuple, TupleData};
@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub struct MessageRecord {
     pub id: Uuid,
     pub agg_id: Uuid,
+    pub event_type: String,
     pub data: String,
 }
 
@@ -25,27 +26,21 @@ impl TryFrom<&Tuple> for MessageRecord {
         let row = value.tuple_data();
 
         let id = {
-            let x = raw_text(row.first().context("missing col 0")?)?;
+            let x = raw_text(row.first().context("missing id")?)?;
             Uuid::from_str(&x).unwrap()
         };
         let agg_id = {
-            let x = raw_text(row.get(1).context("missing col 1")?)?;
+            let x = raw_text(row.get(1).context("missing agg_id")?)?;
             Uuid::from_str(&x).unwrap()
         };
-        let data = raw_text(row.get(2).context("missing col 2")?)?.into();
-        Ok(Self { id, agg_id, data })
-    }
-}
+        let event_type = raw_text(row.get(1).context("missing event_type")?)?.into();
+        let data = raw_text(row.get(2).context("missing col data")?)?.into();
 
-pub trait MessageHandler {
-    fn handle(&self, msg: MessageRecord) -> impl Future<Output = anyhow::Result<()>> + Send;
-}
-
-pub struct PrintHandler;
-
-impl MessageHandler for PrintHandler {
-    async fn handle(&self, msg: MessageRecord) -> anyhow::Result<()> {
-        println!("{:?}", msg);
-        Ok(())
+        Ok(Self {
+            id,
+            agg_id,
+            data,
+            event_type,
+        })
     }
 }
