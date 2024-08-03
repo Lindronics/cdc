@@ -1,0 +1,13 @@
+[package]
+name = "cdc-framework"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+postgres-protocol = { workspace = true }
+tokio-postgres = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+uuid = { workspace = true }
+anyhow = { workspace = true }

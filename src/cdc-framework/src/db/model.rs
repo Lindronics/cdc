@@ -5,14 +5,14 @@ use postgres_protocol::message::backend::{Tuple, TupleData};
 use uuid::Uuid;
 
 #[derive(Debug)]
-pub struct MessageRecord {
+pub struct EventRecord {
     pub id: Uuid,
     pub agg_id: Uuid,
     pub event_type: String,
-    pub data: String,
+    pub data: Vec<u8>,
 }
 
-impl TryFrom<&Tuple> for MessageRecord {
+impl TryFrom<&Tuple> for EventRecord {
     type Error = anyhow::Error;
 
     fn try_from(value: &Tuple) -> Result<Self, Self::Error> {
@@ -34,7 +34,9 @@ impl TryFrom<&Tuple> for MessageRecord {
             Uuid::from_str(&x).unwrap()
         };
         let event_type = raw_text(row.get(1).context("missing event_type")?)?.into();
-        let data = raw_text(row.get(2).context("missing col data")?)?.into();
+        let data = raw_text(row.get(2).context("missing col data")?)?
+            .as_bytes()
+            .to_vec();
 
         Ok(Self {
             id,

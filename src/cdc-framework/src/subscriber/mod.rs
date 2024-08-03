@@ -10,7 +10,7 @@ use handler::EventHandler;
 use postgres_protocol::message::backend::{LogicalReplicationMessage, ReplicationMessage};
 use tokio_postgres::{types::PgLsn, NoTls, SimpleQueryMessage};
 
-use crate::{db, model::MessageRecord};
+use crate::db::{self, EventRecord};
 
 pub mod handler;
 
@@ -64,7 +64,7 @@ impl<T: EventHandler> Subscriber<T> {
 
             match LogicalReplicationMessage::parse(data.data())? {
                 LogicalReplicationMessage::Insert(msg) => {
-                    let record = MessageRecord::try_from(msg.tuple())?;
+                    let record = EventRecord::try_from(msg.tuple())?;
                     self.message_handler.handle(record).await?;
                 }
                 LogicalReplicationMessage::Commit(msg) => {
@@ -110,6 +110,7 @@ async fn get_lsn(client: &tokio_postgres::Client) -> anyhow::Result<PgLsn> {
     Ok(lsn)
 }
 
+// https://github.com/tablelandnetwork/pglogrepl-rust/blob/5fb7b8d55d07246077898489c18361d71c835b7b/src/replication.rs#L109
 fn prepare_ssu(write_lsn: PgLsn) -> Bytes {
     const SECONDS_FROM_UNIX_EPOCH_TO_2000: u128 = 946684800;
 

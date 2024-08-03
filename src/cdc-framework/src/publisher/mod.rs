@@ -2,7 +2,7 @@ use anyhow::Context;
 use tokio::sync::RwLock;
 use tokio_postgres::NoTls;
 
-use crate::{db, model::MessageRecord};
+use crate::db::{self, EventRecord};
 
 pub struct Publisher {
     client: RwLock<tokio_postgres::Client>,
@@ -26,13 +26,18 @@ impl Publisher {
         })
     }
 
-    pub async fn persist_one(&self, event: MessageRecord) -> anyhow::Result<()> {
-        let client_mut = self
+    pub async fn persist_one<T>(&self, event: T) -> anyhow::Result<()>
+    where
+        EventRecord: From<T>,
+    {
+        let event = EventRecord::from(event);
+
+        let client = self
             .client
             .try_read()
             .context("failed to acquire read lock")?;
 
-        client_mut
+        client
             .execute(
                 r#"
                 INSERT INTO events (
@@ -42,21 +47,16 @@ impl Publisher {
                     data
                 ) VALUES ($1, $2, $3, $4)
                 "#,
-                &[
-                    &event.id,
-                    &event.agg_id,
-                    &event.event_type,
-                    &event.data.as_bytes(),
-                ],
+                &[&event.id, &event.agg_id, &event.event_type, &event.data],
             )
             .await?;
 
         Ok(())
     }
-    pub async fn persist(
-        &self,
-        events: impl IntoIterator<Item = MessageRecord>,
-    ) -> anyhow::Result<()> {
+    pub async fn persist<T>(&self, events: impl IntoIterator<Item = T>) -> anyhow::Result<()>
+    where
+        EventRecord: From<T>,
+    {
         let mut client_mut = self
             .client
             .try_write()
@@ -64,6 +64,7 @@ impl Publisher {
 
         let transaction = client_mut.transaction().await?;
         for event in events {
+            let event = EventRecord::from(event);
             transaction
                 .execute(
                     r#"
@@ -74,12 +75,7 @@ impl Publisher {
                         data
                     ) VALUES ($1, $2, $3, $4)
                     "#,
-                    &[
-                        &event.id,
-                        &event.agg_id,
-                        &event.event_type,
-                        &event.data.as_bytes(),
-                    ],
+                    &[&event.id, &event.agg_id, &event.event_type, &event.data],
                 )
                 .await?;
         }

@@ -1,4 +1,3 @@
-mod db;
-pub mod model;
+pub mod db;
 pub mod publisher;
 pub mod subscriber;
