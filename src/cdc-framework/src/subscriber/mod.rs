@@ -1,5 +1,6 @@
 use std::{
     pin::Pin,
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -7,7 +8,9 @@ use anyhow::Context;
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
 use handler::EventHandler;
-use postgres_protocol::message::backend::{LogicalReplicationMessage, ReplicationMessage};
+use postgres_protocol::message::backend::{
+    CommitBody, LogicalReplicationMessage, ReplicationMessage,
+};
 use tokio_postgres::{types::PgLsn, NoTls, SimpleQueryMessage};
 
 use crate::db::{self, EventRecord};
@@ -16,10 +19,13 @@ pub mod handler;
 
 pub struct Subscriber<T: EventHandler> {
     stream: Pin<Box<tokio_postgres::CopyBothDuplex<bytes::Bytes>>>,
-    message_handler: T,
+    message_handler: Arc<T>,
 }
 
-impl<T: EventHandler> Subscriber<T> {
+impl<T> Subscriber<T>
+where
+    T: EventHandler + Send + Sync + 'static,
+{
     pub async fn new(message_handler: T) -> anyhow::Result<Self> {
         let (client, connection) = tokio_postgres::connect(
             "user=postgres password=password host=localhost port=5432 dbname=postgres replication=database",
@@ -31,7 +37,7 @@ impl<T: EventHandler> Subscriber<T> {
 
         db::setup_db(&client).await?;
 
-        let lsn = get_lsn(&client).await?;
+        let lsn = get_start_lsn(&client).await?;
 
         let stream = client
             .copy_both_simple::<bytes::Bytes>(
@@ -50,11 +56,12 @@ impl<T: EventHandler> Subscriber<T> {
 
         Ok(Self {
             stream: Box::pin(stream),
-            message_handler,
+            message_handler: Arc::new(message_handler),
         })
     }
 
     pub async fn listen(&mut self) -> anyhow::Result<()> {
+        let mut futures = vec![];
         while let Some(msg) = self.stream.as_mut().next().await {
             let msg = msg.context("could not get next message in stream")?;
 
@@ -63,14 +70,20 @@ impl<T: EventHandler> Subscriber<T> {
             };
 
             match LogicalReplicationMessage::parse(data.data())? {
+                // Process INSERTS in the background
                 LogicalReplicationMessage::Insert(msg) => {
                     let record = EventRecord::try_from(msg.tuple())?;
-                    self.message_handler.handle(record).await?;
+                    let event_handler = self.message_handler.clone();
+                    futures.push(tokio::spawn(
+                        async move { event_handler.handle(record).await },
+                    ));
                 }
+                // On COMMIT, finish processing all the INSERTS before ACKing the whole transaction
                 LogicalReplicationMessage::Commit(msg) => {
-                    let ssu = prepare_ssu(PgLsn::from(msg.end_lsn()));
-                    self.stream.as_mut().send(ssu).await?;
-                    println!("- ACKED")
+                    futures::future::try_join_all(std::mem::take(&mut futures))
+                        .await
+                        .context("failed to process msg, aborting")?;
+                    self.ack(msg).await?;
                 }
                 _ => {
                     continue;
@@ -79,9 +92,16 @@ impl<T: EventHandler> Subscriber<T> {
         }
         Ok(())
     }
+
+    async fn ack(&mut self, commit: CommitBody) -> anyhow::Result<()> {
+        let ssu = prepare_ssu(PgLsn::from(commit.end_lsn()));
+        self.stream.as_mut().send(ssu).await?;
+        println!("- ACKED");
+        Ok(())
+    }
 }
 
-async fn get_lsn(client: &tokio_postgres::Client) -> anyhow::Result<PgLsn> {
+async fn get_start_lsn(client: &tokio_postgres::Client) -> anyhow::Result<PgLsn> {
     let result = client
         .simple_query(
             r#"
