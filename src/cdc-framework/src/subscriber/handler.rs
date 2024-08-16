@@ -1,7 +1,7 @@
 use std::future::Future;
 
-use crate::db::EventRecord;
+use crate::db::Entity;
 
-pub trait EventHandler {
-    fn handle(&self, msg: EventRecord) -> impl Future<Output = anyhow::Result<()>> + Send;
+pub trait InsertHandler<T: Entity> {
+    fn handle(&self, msg: T) -> impl Future<Output = anyhow::Result<()>> + Send;
 }

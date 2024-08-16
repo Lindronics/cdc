@@ -1,2 +1,2 @@
-pub mod events_publisher;
+pub mod handler;
 pub mod model;

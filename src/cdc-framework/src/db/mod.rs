@@ -7,7 +7,7 @@ mod model;
 mod setup;
 
 pub use config::DbConfig;
-pub use model::EventRecord;
+pub use model::Entity;
 
 pub struct DbClient<const REPLICATION: bool = false> {
     client: tokio_postgres::Client,
@@ -20,8 +20,6 @@ impl<const REPLICATION: bool> DbClient<REPLICATION> {
                 .await
                 .unwrap();
         tokio::spawn(connection);
-
-        setup::setup_db(&client).await?;
 
         Ok(Self { client })
     }

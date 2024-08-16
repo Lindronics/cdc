@@ -1,3 +1,6 @@
 pub mod db;
-pub mod publisher;
-pub mod subscriber;
+mod publisher;
+mod subscriber;
+
+pub use publisher::Publisher;
+pub use subscriber::{handler::InsertHandler, Subscriber};

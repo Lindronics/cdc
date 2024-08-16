@@ -26,7 +26,7 @@ pub mod events {
     }
 }
 
-impl From<OrderEvent> for cdc_framework::db::EventRecord {
+impl From<OrderEvent> for outbox::model::EventRecord {
     fn from(value: OrderEvent) -> Self {
         match value {
             OrderEvent::Created(created) => Self {

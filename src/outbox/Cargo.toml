@@ -1,12 +1,12 @@
 [package]
-name = "cdc-framework"
+name = "outbox"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { workspace = true }
+cdc-framework = { path = "../cdc-framework" }
+
 postgres-protocol = { workspace = true }
 tokio-postgres = { workspace = true }
-bytes = { workspace = true }
-futures = { workspace = true }
+uuid = { workspace = true }
 anyhow = { workspace = true }

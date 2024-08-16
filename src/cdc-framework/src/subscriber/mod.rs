@@ -7,39 +7,43 @@ use std::{
 use anyhow::Context;
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
-use handler::EventHandler;
+use handler::InsertHandler;
 use postgres_protocol::message::backend::{
     CommitBody, LogicalReplicationMessage, ReplicationMessage,
 };
 use tokio_postgres::{types::PgLsn, SimpleQueryMessage};
 
-use crate::db::{self, EventRecord};
+use crate::db::{self, Entity};
 
 pub mod handler;
 
-pub struct Subscriber<T: EventHandler> {
+pub struct Subscriber<T: Entity, H: InsertHandler<T>> {
     stream: Pin<Box<tokio_postgres::CopyBothDuplex<bytes::Bytes>>>,
-    message_handler: Arc<T>,
+    message_handler: Arc<H>,
+    t: std::marker::PhantomData<T>,
 }
 
-impl<T> Subscriber<T>
+impl<T, H> Subscriber<T, H>
 where
-    T: EventHandler + Send + Sync + 'static,
+    T: Entity,
+    H: InsertHandler<T> + Send + Sync + 'static,
 {
-    pub async fn new(db_client: &db::DbClient<true>, message_handler: T) -> anyhow::Result<Self> {
-        let lsn = get_start_lsn(db_client).await?;
+    pub async fn new(db_client: &db::DbClient<true>, message_handler: H) -> anyhow::Result<Self> {
+        db_client.setup::<T>().await?;
+        let lsn = get_start_lsn(db_client, T::TABLE).await?;
 
         let stream = db_client
             .copy_both_simple::<bytes::Bytes>(
                 &(format!(
                     r#"
-                    START_REPLICATION SLOT events_slot 
+                    START_REPLICATION SLOT {table}_slot 
                     LOGICAL {lsn} 
                     (
                         "proto_version" '1', 
-                        "publication_names" 'events_pub'
+                        "publication_names" '{table}_pub'
                     );
                     "#,
+                    table = T::TABLE,
                 )),
             )
             .await?;
@@ -47,6 +51,7 @@ where
         Ok(Self {
             stream: Box::pin(stream),
             message_handler: Arc::new(message_handler),
+            t: std::marker::PhantomData,
         })
     }
 
@@ -62,7 +67,7 @@ where
             match LogicalReplicationMessage::parse(data.data())? {
                 // Process INSERTS in the background
                 LogicalReplicationMessage::Insert(msg) => {
-                    let record = EventRecord::try_from(msg.tuple())?;
+                    let record = T::from_tuple(msg.tuple())?;
                     let event_handler = self.message_handler.clone();
                     futures.push(tokio::spawn(
                         async move { event_handler.handle(record).await },
@@ -91,15 +96,15 @@ where
     }
 }
 
-async fn get_start_lsn(client: &tokio_postgres::Client) -> anyhow::Result<PgLsn> {
+async fn get_start_lsn(client: &db::DbClient<true>, table: &str) -> anyhow::Result<PgLsn> {
     let result = client
-        .simple_query(
+        .simple_query(&format!(
             r#"
             SELECT confirmed_flush_lsn
             FROM pg_replication_slots
-            WHERE slot_name = 'events_slot'
+            WHERE slot_name = '{table}_slot'
             "#,
-        )
+        ))
         .await?;
 
     let row = result

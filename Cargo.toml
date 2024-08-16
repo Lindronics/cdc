@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["src/cdc-framework", "src/application"]
+members = ["src/cdc-framework", "src/application", "src/outbox"]
 
 [workspace.dependencies]
 tokio = { version = "1.39.2", features = ["rt-multi-thread", "macros"] }
