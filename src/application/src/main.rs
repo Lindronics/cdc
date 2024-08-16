@@ -1,12 +1,27 @@
 use application::events_publisher::EventPublisher;
-use cdc_framework::{db, publisher, subscriber::Subscriber};
+use cdc_framework::{
+    db::{self, DbClient},
+    publisher,
+    subscriber::Subscriber,
+};
 use uuid::Uuid;
 
 #[tokio::main]
 async fn main() {
-    let publisher = publisher::Publisher::new().await.unwrap();
+    let config = db::DbConfig {
+        host: "localhost".into(),
+        port: 5432,
+        user: "postgres".into(),
+        password: "password".into(),
+        dbname: "postgres".into(),
+    };
+    let publisher = publisher::Publisher::new(DbClient::new(&config).await.unwrap())
+        .await
+        .unwrap();
 
-    let mut handler = Subscriber::new(EventPublisher).await.unwrap();
+    let mut handler = Subscriber::new(&DbClient::new(&config).await.unwrap(), EventPublisher)
+        .await
+        .unwrap();
     let _bg = tokio::spawn(async move { handler.listen().await });
 
     insert_some_records(&publisher).await;

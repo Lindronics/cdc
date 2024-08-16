@@ -11,7 +11,7 @@ use handler::EventHandler;
 use postgres_protocol::message::backend::{
     CommitBody, LogicalReplicationMessage, ReplicationMessage,
 };
-use tokio_postgres::{types::PgLsn, NoTls, SimpleQueryMessage};
+use tokio_postgres::{types::PgLsn, SimpleQueryMessage};
 
 use crate::db::{self, EventRecord};
 
@@ -26,20 +26,10 @@ impl<T> Subscriber<T>
 where
     T: EventHandler + Send + Sync + 'static,
 {
-    pub async fn new(message_handler: T) -> anyhow::Result<Self> {
-        let (client, connection) = tokio_postgres::connect(
-            "user=postgres password=password host=localhost port=5432 dbname=postgres replication=database",
-            NoTls,
-        )
-        .await
-        .unwrap();
-        tokio::spawn(connection);
+    pub async fn new(db_client: &db::DbClient<true>, message_handler: T) -> anyhow::Result<Self> {
+        let lsn = get_start_lsn(db_client).await?;
 
-        db::setup_db(&client).await?;
-
-        let lsn = get_start_lsn(&client).await?;
-
-        let stream = client
+        let stream = db_client
             .copy_both_simple::<bytes::Bytes>(
                 &(format!(
                     r#"

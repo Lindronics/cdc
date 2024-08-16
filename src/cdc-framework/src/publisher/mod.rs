@@ -1,28 +1,16 @@
 use anyhow::Context;
 use tokio::sync::RwLock;
-use tokio_postgres::NoTls;
 
 use crate::db::{self, EventRecord};
 
 pub struct Publisher {
-    client: RwLock<tokio_postgres::Client>,
+    client: RwLock<db::DbClient>,
 }
 
 impl Publisher {
-    pub async fn new() -> anyhow::Result<Self> {
-        let (client, connection) = tokio_postgres::connect(
-            "user=postgres password=password host=localhost port=5432 dbname=postgres",
-            NoTls,
-        )
-        .await
-        .unwrap();
-        tokio::spawn(connection);
-
-        // Ensure the database is setup
-        db::setup_db(&client).await?;
-
+    pub async fn new(db_client: db::DbClient) -> anyhow::Result<Self> {
         Ok(Self {
-            client: RwLock::new(client),
+            client: RwLock::new(db_client),
         })
     }
 
