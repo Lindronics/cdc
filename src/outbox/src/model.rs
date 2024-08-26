@@ -1,9 +1,16 @@
+use core::str;
 use std::{borrow::Cow, str::FromStr};
 
 use anyhow::Context;
 use cdc_framework::db::Entity;
 use postgres_replication::protocol::{Tuple, TupleData};
 use uuid::Uuid;
+
+pub trait Event: Sized {
+    fn from_record(record: EventRecord) -> anyhow::Result<Self>;
+
+    fn into_record(self) -> EventRecord;
+}
 
 #[derive(Debug)]
 pub struct EventRecord {
@@ -15,18 +22,6 @@ pub struct EventRecord {
 
 impl Entity for EventRecord {
     const TABLE: &'static str = "events";
-    const INSERT_SQL: &'static str = r#"
-        INSERT INTO events (
-            id,
-            agg_id,
-            event_type,
-            data
-        ) VALUES ($1, $2, $3, $4);
-        "#;
-
-    fn as_args(&self) -> Vec<&(dyn tokio_postgres::types::ToSql + Sync)> {
-        vec![&self.id, &self.agg_id, &self.event_type, &self.data]
-    }
 
     fn from_tuple(tuple: &Tuple) -> anyhow::Result<Self>
     where
@@ -57,10 +52,11 @@ impl TryFrom<&Tuple> for EventRecord {
             let x = raw_text(row.get(1).context("missing agg_id")?)?;
             Uuid::from_str(&x).unwrap()
         };
-        let event_type = raw_text(row.get(1).context("missing event_type")?)?.into();
-        let data = raw_text(row.get(2).context("missing col data")?)?
-            .as_bytes()
-            .to_vec();
+        let event_type = raw_text(row.get(2).context("missing event_type")?)?.into();
+        let data = match row.get(3).context("missing col data")? {
+            TupleData::Text(x) => hex::decode(x.slice(2..))?,
+            _ => anyhow::bail!("expected text"),
+        };
 
         Ok(Self {
             id,

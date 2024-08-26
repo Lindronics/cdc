@@ -1,13 +1,35 @@
-use cdc_framework::db::Entity;
+use cdc_framework::{db::Entity, Subscriber};
 pub use cdc_framework::{
     db::{DbClient, DbConfig},
     InsertHandler as EventHandler,
 };
+use model::EventRecord;
 
+pub mod amqp;
+pub mod client;
 pub mod model;
 
-pub type Publisher = cdc_framework::Publisher<model::EventRecord>;
-pub type Subscriber<Handler> = cdc_framework::Subscriber<model::EventRecord, Handler>;
+pub async fn new<T>(
+    db_config: &DbConfig,
+    amqp_connection: &::amqp::Connection,
+) -> anyhow::Result<(
+    client::OutboxClient,
+    Subscriber<EventRecord, amqp::AmqpPublisher<T>>,
+)>
+where
+    T: model::Event + ::amqp::Message + Send + Sync + 'static,
+{
+    let replication_client = DbClient::<true>::new(db_config).await?;
+    let amqp_publisher = ::amqp::AmqpPublisher::new(amqp_connection).await?;
+
+    let sub = Subscriber::new(
+        &replication_client,
+        amqp::AmqpPublisher::new(amqp_publisher),
+    )
+    .await?;
+    let client = client::OutboxClient::new(db_config).await?;
+    Ok((client, sub))
+}
 
 pub async fn setup(client: &DbClient<false>) -> anyhow::Result<()> {
     client

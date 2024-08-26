@@ -1,5 +1,4 @@
-use anyhow::Context;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::db::{self, Entity};
 
@@ -17,28 +16,11 @@ impl<T: Entity> Publisher<T> {
         })
     }
 
-    pub async fn persist_one(&self, item: T) -> anyhow::Result<()> {
-        let client = self
-            .client
-            .try_read()
-            .context("failed to acquire read lock")?;
-
-        client.execute(T::INSERT_SQL, &item.as_args()).await?;
-
-        Ok(())
+    pub async fn as_ref(&self) -> RwLockReadGuard<'_, db::DbClient> {
+        self.client.read().await
     }
-    pub async fn persist(&self, items: impl IntoIterator<Item = T>) -> anyhow::Result<()> {
-        let mut client_mut = self
-            .client
-            .try_write()
-            .context("failed to acquire write lock")?;
 
-        let transaction = client_mut.transaction().await?;
-        for item in items {
-            transaction.execute(T::INSERT_SQL, &item.as_args()).await?;
-        }
-        transaction.commit().await?;
-
-        Ok(())
+    pub async fn as_mut(&self) -> RwLockWriteGuard<'_, db::DbClient> {
+        self.client.write().await
     }
 }

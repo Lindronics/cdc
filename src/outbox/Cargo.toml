@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+amqp = { path = "../amqp" }
 cdc-framework = { path = "../cdc-framework" }
 
+hex = { workspace = true }
 postgres-replication = { workspace = true }
 tokio-postgres = { workspace = true }
 uuid = { workspace = true }

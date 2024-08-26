@@ -14,9 +14,32 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      rabbitmq:
+        image: rabbitmq:management
+        ports:
+          - "5672:5672"
+          - "15672:15672"
+
+
     steps:
     - uses: actions/checkout@v4
+    - name: Enable logical replication
+      run: psql "user=postgres password=password host=localhost port=5432 dbname=postgres replication=database" -c "ALTER SYSTEM SET wal_level = 'logical';"
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --tests
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test
