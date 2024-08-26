@@ -8,9 +8,7 @@ use anyhow::Context;
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
 use handler::InsertHandler;
-use postgres_protocol::message::backend::{
-    CommitBody, LogicalReplicationMessage, ReplicationMessage,
-};
+use postgres_replication::protocol::{CommitBody, LogicalReplicationMessage, ReplicationMessage};
 use tokio_postgres::{types::PgLsn, SimpleQueryMessage};
 
 use crate::db::{self, Entity};

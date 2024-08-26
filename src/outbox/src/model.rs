@@ -2,7 +2,7 @@ use std::{borrow::Cow, str::FromStr};
 
 use anyhow::Context;
 use cdc_framework::db::Entity;
-use postgres_protocol::message::backend::{Tuple, TupleData};
+use postgres_replication::protocol::{Tuple, TupleData};
 use uuid::Uuid;
 
 #[derive(Debug)]

@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { workspace = true }
-postgres-protocol = { workspace = true }
+postgres-replication = { workspace = true }
 tokio-postgres = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }

@@ -1,4 +1,4 @@
-use postgres_protocol::message::backend::Tuple;
+use postgres_replication::protocol::Tuple;
 use tokio_postgres::types::ToSql;
 
 pub trait Entity: Send + 'static {

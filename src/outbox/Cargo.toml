@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 cdc-framework = { path = "../cdc-framework" }
 
-postgres-protocol = { workspace = true }
+postgres-replication = { workspace = true }
 tokio-postgres = { workspace = true }
 uuid = { workspace = true }
 anyhow = { workspace = true }
