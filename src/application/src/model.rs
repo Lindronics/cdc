@@ -59,6 +59,7 @@ impl outbox::model::Event for OrderEvent {
                 OrderEventInner::Delivered(_) => ORDER_DELIVERED.to_string(),
             },
             data: serde_json::to_vec(&self.inner).unwrap(),
+            ttl: 17,
         }
     }
 }

@@ -8,11 +8,11 @@ pub struct AmqpPublisher<T> {
 }
 
 impl<T> AmqpPublisher<T> {
-    pub fn new(publisher: amqp::AmqpPublisher) -> Self {
-        Self {
-            inner: publisher,
+    pub async fn new(connection: &amqp::Connection) -> anyhow::Result<Self> {
+        Ok(Self {
+            inner: ::amqp::AmqpPublisher::new(connection).await?,
             t: std::marker::PhantomData,
-        }
+        })
     }
 
     pub async fn publish(&self, event: &T) -> anyhow::Result<()>
@@ -28,7 +28,6 @@ where
     T: Event + amqp::Message + Send + Sync,
 {
     async fn handle(&self, msg: EventRecord) -> anyhow::Result<()> {
-        println!("Handling msg: {:?}", msg.id);
         self.publish(&T::from_record(msg)?).await
     }
 }

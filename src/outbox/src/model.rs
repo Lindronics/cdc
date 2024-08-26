@@ -18,6 +18,7 @@ pub struct EventRecord {
     pub agg_id: Uuid,
     pub event_type: String,
     pub data: Vec<u8>,
+    pub ttl: i16,
 }
 
 impl Entity for EventRecord {
@@ -57,12 +58,14 @@ impl TryFrom<&Tuple> for EventRecord {
             TupleData::Text(x) => hex::decode(x.slice(2..))?,
             _ => anyhow::bail!("expected text"),
         };
+        let ttl = raw_text(row.get(4).context("missing col ttl")?)?.parse()?;
 
         Ok(Self {
             id,
             agg_id,
             data,
             event_type,
+            ttl,
         })
     }
 }

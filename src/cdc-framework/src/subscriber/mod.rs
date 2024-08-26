@@ -63,7 +63,7 @@ where
             };
 
             match LogicalReplicationMessage::parse(data.data())? {
-                // Process INSERTS in the background
+                // Process INSERTs in the background
                 LogicalReplicationMessage::Insert(msg) => {
                     let record = T::from_tuple(msg.tuple())?;
                     let event_handler = self.message_handler.clone();
@@ -71,7 +71,16 @@ where
                         async move { event_handler.handle(record).await },
                     ));
                 }
-                // On COMMIT, finish processing all the INSERTS before ACKing the whole transaction
+                // Process UPDATEs in the background
+                LogicalReplicationMessage::Update(msg) => {
+                    let record = T::from_tuple(msg.new_tuple())?;
+                    let event_handler = self.message_handler.clone();
+                    futures.push(tokio::spawn(
+                        async move { event_handler.handle(record).await },
+                    ));
+                }
+                // On COMMIT, finish processing all the INSERTs and UPDATEs
+                // before ACKing the whole transaction
                 LogicalReplicationMessage::Commit(msg) => {
                     futures::future::try_join_all(std::mem::take(&mut futures))
                         .await

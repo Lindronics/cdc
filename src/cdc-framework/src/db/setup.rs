@@ -11,7 +11,7 @@ impl<const REPLICATION: bool> super::DbClient<REPLICATION> {
                 r#"
                 CREATE PUBLICATION {table}_pub
                 FOR TABLE {table}
-                WITH (publish = 'insert');
+                WITH (publish = 'insert, update');
                 "#,
                 table = T::TABLE
             ))

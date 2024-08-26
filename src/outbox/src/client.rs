@@ -1,4 +1,6 @@
+use anyhow::Context;
 use cdc_framework::db;
+use uuid::Uuid;
 
 use crate::model;
 
@@ -7,8 +9,9 @@ const INSERT_SQL: &str = r#"
         id,
         agg_id,
         event_type,
-        data
-    ) VALUES ($1, $2, $3, $4);
+        data,
+        ttl
+    ) VALUES ($1, $2, $3, $4, $5);
 "#;
 
 pub struct OutboxClient {
@@ -31,7 +34,13 @@ impl OutboxClient {
         client
             .execute(
                 INSERT_SQL,
-                &[&record.id, &record.agg_id, &record.event_type, &record.data],
+                &[
+                    &record.id,
+                    &record.agg_id,
+                    &record.event_type,
+                    &record.data,
+                    &record.ttl,
+                ],
             )
             .await?;
 
@@ -50,11 +59,44 @@ impl OutboxClient {
             transaction
                 .execute(
                     INSERT_SQL,
-                    &[&record.id, &record.agg_id, &record.event_type, &record.data],
+                    &[
+                        &record.id,
+                        &record.agg_id,
+                        &record.event_type,
+                        &record.data,
+                        &record.ttl,
+                    ],
                 )
                 .await?;
         }
         transaction.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn get_dead_messages(&self) -> anyhow::Result<Vec<Uuid>> {
+        let client = self.db_publisher.as_ref().await;
+        let rows = client
+            .query("SELECT * FROM events WHERE ttl <= 0", &[])
+            .await?;
+
+        rows.into_iter()
+            .map(|row| row.try_get("id"))
+            .collect::<Result<Vec<_>, _>>()
+            .context("Error getting dead messages")
+    }
+
+    pub(crate) async fn update_ttl(&self, id: Uuid, ttl: i16) -> anyhow::Result<()> {
+        let client = self.db_publisher.as_ref().await;
+
+        client
+            .execute(
+                "UPDATE events SET ttl = $2 WHERE id = $1;",
+                &[&id, &(ttl - 1)],
+            )
+            .await
+            .context("Error updating TTL")
+            .map(|_| ())?;
 
         Ok(())
     }
