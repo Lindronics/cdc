@@ -12,3 +12,11 @@ postgres-replication = { workspace = true }
 tokio-postgres = { workspace = true }
 uuid = { workspace = true }
 anyhow = { workspace = true }
+
+[dev-dependencies]
+futures = { workspace = true }
+lapin = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+uuid = { workspace = true, features = ["serde"] }
