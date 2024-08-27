@@ -7,7 +7,7 @@ use lapin::{
 
 pub use lapin::{Connection, ConnectionProperties};
 
-pub trait Message {
+pub trait Publish {
     fn exchange(&self) -> &str;
 
     fn routing_key(&self) -> &str;
@@ -28,7 +28,7 @@ impl AmqpPublisher {
         Ok(Self { channel })
     }
 
-    pub async fn publish(&self, m: &impl Message) -> anyhow::Result<()> {
+    pub async fn publish(&self, m: &impl Publish) -> anyhow::Result<()> {
         let confirmation = self
             .channel
             .basic_publish(

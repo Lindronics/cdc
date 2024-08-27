@@ -6,7 +6,7 @@ use cdc_framework::db::Entity;
 use postgres_replication::protocol::{Tuple, TupleData};
 use uuid::Uuid;
 
-pub trait Event: Sized {
+pub trait Message: Sized {
     fn from_record(record: EventRecord) -> anyhow::Result<Self>;
 
     fn into_record(self) -> EventRecord;

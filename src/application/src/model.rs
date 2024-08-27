@@ -40,7 +40,7 @@ pub mod events {
     }
 }
 
-impl outbox::model::Event for OrderEvent {
+impl outbox::model::Message for OrderEvent {
     fn from_record(record: outbox::model::EventRecord) -> anyhow::Result<Self> {
         Ok(OrderEvent {
             event_id: record.id,
@@ -64,7 +64,7 @@ impl outbox::model::Event for OrderEvent {
     }
 }
 
-impl outbox::amqp::Message for OrderEvent {
+impl outbox::handlers::Publish for OrderEvent {
     fn exchange(&self) -> &str {
         EXCHANGE
     }

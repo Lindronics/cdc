@@ -1,11 +1,11 @@
-use amqp::Message;
+use amqp::Publish;
 use lapin::{
     options::ExchangeDeclareOptions, types::FieldTable, ConnectionProperties, ExchangeKind,
 };
 
 struct TestMsg(String);
 
-impl Message for TestMsg {
+impl Publish for TestMsg {
     fn exchange(&self) -> &str {
         "test-exchange"
     }

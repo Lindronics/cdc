@@ -27,7 +27,7 @@ impl OutboxClient {
         Ok(Self { db_publisher })
     }
 
-    pub async fn persist_one(&self, item: impl model::Event) -> anyhow::Result<()> {
+    pub async fn persist_one(&self, item: impl model::Message) -> anyhow::Result<()> {
         let client = self.db_publisher.as_ref().await;
         let record = item.into_record();
 
@@ -49,7 +49,7 @@ impl OutboxClient {
 
     pub async fn persist(
         &self,
-        items: impl IntoIterator<Item = impl model::Event>,
+        items: impl IntoIterator<Item = impl model::Message>,
     ) -> anyhow::Result<()> {
         let mut client_mut = self.db_publisher.as_mut().await;
 

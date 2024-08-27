@@ -5,10 +5,9 @@ pub use cdc_framework::{
 };
 use model::EventRecord;
 
-pub mod amqp;
 pub mod client;
+pub mod handlers;
 pub mod model;
-pub mod retry;
 
 pub async fn new<T>(
     db_config: &DbConfig,
@@ -18,13 +17,13 @@ pub async fn new<T>(
     Subscriber<EventRecord, impl EventHandler<model::EventRecord>>,
 )>
 where
-    T: model::Event + ::amqp::Message + Send + Sync + 'static,
+    T: model::Message + ::amqp::Publish + Send + Sync + 'static,
 {
     let replication_client = DbClient::<true>::new(db_config).await?;
     setup(&replication_client).await?;
 
-    let amqp_publisher = amqp::AmqpPublisher::<T>::new(amqp_connection).await?;
-    let retry_handler = retry::RetryHandler::new(db_config, amqp_publisher).await?;
+    let amqp_publisher = handlers::AmqpPublisher::<T>::new(amqp_connection).await?;
+    let retry_handler = handlers::RetryHandler::new(db_config, amqp_publisher).await?;
 
     let sub = Subscriber::new(&replication_client, retry_handler).await?;
     let client = client::OutboxClient::new(db_config).await?;
