@@ -1,17 +1,19 @@
+use std::sync::Arc;
+
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::db::{self, Entity};
 
+#[derive(Clone)]
 pub struct Publisher<T: Entity> {
-    client: RwLock<db::DbClient>,
+    client: Arc<RwLock<db::DbClient>>,
     t: std::marker::PhantomData<T>,
 }
 
 impl<T: Entity> Publisher<T> {
     pub async fn new(db_client: db::DbClient) -> anyhow::Result<Self> {
-        db_client.setup::<T>().await?;
         Ok(Self {
-            client: RwLock::new(db_client),
+            client: Arc::new(RwLock::new(db_client)),
             t: std::marker::PhantomData,
         })
     }

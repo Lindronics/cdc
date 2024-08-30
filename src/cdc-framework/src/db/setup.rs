@@ -1,31 +1,35 @@
-use super::model::Entity;
+use super::config::ReplicationConfig;
 
 impl<const REPLICATION: bool> super::DbClient<REPLICATION> {
-    pub async fn setup<T: Entity>(&self) -> anyhow::Result<()> {
+    pub async fn setup(&self, config: &ReplicationConfig) -> anyhow::Result<()> {
         // Table has to exist
-        anyhow::ensure!(self.table_exists(T::TABLE).await?);
+        anyhow::ensure!(self.table_exists(&config.table).await?);
 
         // Setup publication if not exists
-        if !self.publication_exists(T::TABLE).await? {
+        if !self.publication_exists(&config.publication).await? {
             self.simple_query(&format!(
                 r#"
-                CREATE PUBLICATION {table}_pub
-                FOR TABLE {table}
+                CREATE PUBLICATION {publication}
+                FOR TABLE "{table}"
                 WITH (publish = 'insert, update');
                 "#,
-                table = T::TABLE
+                table = config.table,
+                publication = config.publication,
             ))
             .await?;
         }
 
         // Setup replication slot if not exists
-        if !self.replication_slot_exists(T::TABLE).await? {
+        if !self
+            .replication_slot_exists(&config.replication_slot)
+            .await?
+        {
             self.simple_query(&format!(
                 r#"
-                CREATE_REPLICATION_SLOT {table}_slot
+                CREATE_REPLICATION_SLOT "{slot}"
                 LOGICAL "pgoutput" NOEXPORT_SNAPSHOT;
                 "#,
-                table = T::TABLE
+                slot = config.replication_slot,
             ))
             .await?;
         }
@@ -48,10 +52,10 @@ impl<const REPLICATION: bool> super::DbClient<REPLICATION> {
             .is_some())
     }
 
-    async fn publication_exists(&self, table: &str) -> anyhow::Result<bool> {
+    async fn publication_exists(&self, publication: &str) -> anyhow::Result<bool> {
         let publications = self
             .simple_query(&format!(
-                "SELECT * FROM pg_publication WHERE pubname = '{table}_pub';"
+                "SELECT * FROM pg_publication WHERE pubname = '{publication}';"
             ))
             .await?;
         Ok(publications
@@ -63,16 +67,17 @@ impl<const REPLICATION: bool> super::DbClient<REPLICATION> {
             .is_some())
     }
 
-    async fn replication_slot_exists(&self, table: &str) -> anyhow::Result<bool> {
+    async fn replication_slot_exists(&self, slot: &str) -> anyhow::Result<bool> {
         let publications = self
             .simple_query(&format!(
                 r#"
                 SELECT *
                 FROM pg_replication_slots
-                WHERE slot_name = '{table}_slot'
+                WHERE slot_name = '{slot}'
                 AND database = '{db}';
                 "#,
                 db = self.dbname,
+                slot = slot,
             ))
             .await?;
         Ok(publications

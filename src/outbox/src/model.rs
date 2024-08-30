@@ -12,7 +12,7 @@ pub trait Message: Sized {
     fn into_record(self) -> EventRecord;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EventRecord {
     pub id: Uuid,
     pub agg_id: Uuid,

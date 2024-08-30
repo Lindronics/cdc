@@ -1,30 +1,28 @@
 use anyhow::Context;
-use cdc_framework::db;
+use cdc_framework::db::{self, ReplicationConfig};
 use uuid::Uuid;
 
 use crate::model;
 
-const INSERT_SQL: &str = r#"
-    INSERT INTO events (
-        id,
-        agg_id,
-        event_type,
-        data,
-        ttl
-    ) VALUES ($1, $2, $3, $4, $5);
-"#;
-
+#[derive(Clone)]
 pub struct OutboxClient {
     db_publisher: cdc_framework::Publisher<model::EventRecord>,
+    table: String,
 }
 
 impl OutboxClient {
-    pub async fn new(db_config: &db::DbConfig) -> anyhow::Result<Self> {
+    pub async fn new(
+        db_config: &db::DbConfig,
+        replication_config: &ReplicationConfig,
+    ) -> anyhow::Result<Self> {
         let db_client = db::DbClient::new(db_config).await?;
-        crate::setup(&db_client).await?;
+        crate::setup(&db_client, &replication_config.table).await?;
 
         let db_publisher = cdc_framework::Publisher::new(db_client).await?;
-        Ok(Self { db_publisher })
+        Ok(Self {
+            db_publisher,
+            table: replication_config.table.clone(),
+        })
     }
 
     pub async fn persist_one(&self, item: impl model::Message) -> anyhow::Result<()> {
@@ -33,7 +31,18 @@ impl OutboxClient {
 
         client
             .execute(
-                INSERT_SQL,
+                &format!(
+                    r#"
+                    INSERT INTO {table} (
+                        id,
+                        agg_id,
+                        event_type,
+                        data,
+                        ttl
+                    ) VALUES ($1, $2, $3, $4, $5);
+                    "#,
+                    table = self.table,
+                ),
                 &[
                     &record.id,
                     &record.agg_id,
@@ -58,7 +67,18 @@ impl OutboxClient {
             let record = item.into_record();
             transaction
                 .execute(
-                    INSERT_SQL,
+                    &format!(
+                        r#"
+                        INSERT INTO {table} (
+                            id,
+                            agg_id,
+                            event_type,
+                            data,
+                            ttl
+                        ) VALUES ($1, $2, $3, $4, $5);
+                        "#,
+                        table = self.table,
+                    ),
                     &[
                         &record.id,
                         &record.agg_id,
@@ -77,7 +97,7 @@ impl OutboxClient {
     pub async fn get_dead_messages(&self) -> anyhow::Result<Vec<Uuid>> {
         let client = self.db_publisher.as_ref().await;
         let rows = client
-            .query("SELECT * FROM events WHERE ttl <= 0", &[])
+            .query("SELECT * FROM $1 WHERE ttl <= 0", &[&self.table])
             .await?;
 
         rows.into_iter()
@@ -91,7 +111,7 @@ impl OutboxClient {
 
         client
             .execute(
-                "UPDATE events SET ttl = $2 WHERE id = $1;",
+                &format!("UPDATE {} SET ttl = $2 WHERE id = $1;", self.table),
                 &[&id, &(ttl - 1)],
             )
             .await

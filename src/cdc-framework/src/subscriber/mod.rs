@@ -11,7 +11,7 @@ use handler::EventHandler;
 use postgres_replication::protocol::{CommitBody, LogicalReplicationMessage, ReplicationMessage};
 use tokio_postgres::{types::PgLsn, SimpleQueryMessage};
 
-use crate::db::{self, Entity};
+use crate::db::{self, Entity, ReplicationConfig};
 
 pub mod handler;
 
@@ -26,22 +26,27 @@ where
     T: Entity,
     H: EventHandler<T> + Send + Sync + 'static,
 {
-    pub async fn new(db_client: &db::DbClient<true>, message_handler: H) -> anyhow::Result<Self> {
-        db_client.setup::<T>().await?;
-        let lsn = get_start_lsn(db_client, T::TABLE).await?;
+    pub async fn new(
+        db_client: &db::DbClient<true>,
+        replication_config: &ReplicationConfig,
+        message_handler: H,
+    ) -> anyhow::Result<Self> {
+        db_client.setup(replication_config).await?;
+        let lsn = get_start_lsn(db_client, replication_config).await?;
 
         let stream = db_client
             .copy_both_simple::<bytes::Bytes>(
                 &(format!(
                     r#"
-                    START_REPLICATION SLOT {table}_slot
+                    START_REPLICATION SLOT {slot}
                     LOGICAL {lsn}
                     (
                         "proto_version" '1',
-                        "publication_names" '{table}_pub'
+                        "publication_names" '{publication}'
                     );
                     "#,
-                    table = T::TABLE,
+                    slot = replication_config.replication_slot,
+                    publication = replication_config.publication,
                 )),
             )
             .await?;
@@ -103,14 +108,18 @@ where
     }
 }
 
-async fn get_start_lsn(client: &db::DbClient<true>, table: &str) -> anyhow::Result<PgLsn> {
+async fn get_start_lsn(
+    client: &db::DbClient<true>,
+    replication_config: &ReplicationConfig,
+) -> anyhow::Result<PgLsn> {
     let result = client
         .simple_query(&format!(
             r#"
             SELECT confirmed_flush_lsn
             FROM pg_replication_slots
-            WHERE slot_name = '{table}_slot'
+            WHERE slot_name = '{slot}'
             "#,
+            slot = replication_config.replication_slot
         ))
         .await?;
 
@@ -120,7 +129,7 @@ async fn get_start_lsn(client: &db::DbClient<true>, table: &str) -> anyhow::Resu
             SimpleQueryMessage::Row(row) => Some(row),
             _ => None,
         })
-        .context("empty rows")?;
+        .context("get confirmed_flush_lsn: empty rows")?;
 
     let lsn = row
         .get("confirmed_flush_lsn")

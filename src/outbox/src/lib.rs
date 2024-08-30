@@ -1,6 +1,5 @@
-use cdc_framework::db::Entity;
 pub use cdc_framework::{
-    db::{DbClient, DbConfig},
+    db::{DbClient, DbConfig, ReplicationConfig},
     EventHandler,
 };
 use client::OutboxClient;
@@ -14,6 +13,7 @@ pub mod subscriber;
 
 pub async fn new<T>(
     db_config: &DbConfig,
+    replication_config: &ReplicationConfig,
     amqp_connection: &::amqp::Connection,
 ) -> anyhow::Result<(
     OutboxClient,
@@ -22,19 +22,23 @@ pub async fn new<T>(
 where
     T: model::Message + ::amqp::Publish + Send + Sync + 'static,
 {
-    let amqp_publisher = handlers::AmqpPublisher::<T>::new(amqp_connection).await?;
-    let retry_handler = handlers::EagerRetryHandler::new(db_config, amqp_publisher).await?;
+    let client = OutboxClient::new(db_config, replication_config).await?;
 
-    let sub = OutboxSubscriber::new(&db_config, retry_handler).await?;
-    let client = OutboxClient::new(db_config).await?;
+    let amqp_publisher = handlers::AmqpPublisher::<T>::new(amqp_connection).await?;
+    let retry_handler = handlers::EagerRetryHandler::new(client.clone(), amqp_publisher).await?;
+
+    let sub = OutboxSubscriber::new(db_config, replication_config, retry_handler).await?;
     Ok((client, sub))
 }
 
-pub async fn setup<const REPLICATION: bool>(client: &DbClient<REPLICATION>) -> anyhow::Result<()> {
+pub async fn setup<const REPLICATION: bool>(
+    client: &DbClient<REPLICATION>,
+    table: &str,
+) -> anyhow::Result<()> {
     client
         .simple_query(&format!(
             r#"
-            CREATE TABLE IF NOT EXISTS {table} (
+            CREATE TABLE IF NOT EXISTS "{table}" (
                 id UUID PRIMARY KEY,
                 agg_id UUID NOT NULL,
                 event_type TEXT NOT NULL,
@@ -42,8 +46,7 @@ pub async fn setup<const REPLICATION: bool>(client: &DbClient<REPLICATION>) -> a
                 ttl smallint NOT NULL,
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
-            "#,
-            table = model::EventRecord::TABLE
+            "#
         ))
         .await?;
 

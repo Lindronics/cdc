@@ -19,3 +19,10 @@ impl DbConfig {
         s
     }
 }
+
+#[derive(Debug)]
+pub struct ReplicationConfig {
+    pub table: String,
+    pub publication: String,
+    pub replication_slot: String,
+}

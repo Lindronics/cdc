@@ -6,12 +6,12 @@ mod config;
 mod model;
 mod setup;
 
-pub use config::DbConfig;
+pub use config::{DbConfig, ReplicationConfig};
 pub use model::Entity;
 
 pub struct DbClient<const REPLICATION: bool = false> {
+    pub dbname: String,
     client: tokio_postgres::Client,
-    dbname: String,
 }
 
 impl<const REPLICATION: bool> DbClient<REPLICATION> {

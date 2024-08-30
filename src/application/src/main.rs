@@ -21,6 +21,11 @@ async fn main() {
         password: "password".into(),
         dbname: "postgres".into(),
     };
+    let replication_config = outbox::ReplicationConfig {
+        table: "events".into(),
+        publication: "events_pub".into(),
+        replication_slot: "events_slot".into(),
+    };
     let amqp_connection =
         Connection::connect("amqp://127.0.0.1:5672", ConnectionProperties::default())
             .await
@@ -28,9 +33,10 @@ async fn main() {
     let consumer_channel = amqp_connection.create_channel().await.unwrap();
     setup_amqp(&consumer_channel).await;
 
-    let (outbox_client, handler) = outbox::new::<OrderEvent>(&config, &amqp_connection)
-        .await
-        .unwrap();
+    let (outbox_client, handler) =
+        outbox::new::<OrderEvent>(&config, &replication_config, &amqp_connection)
+            .await
+            .unwrap();
     let _bg = tokio::spawn(async move { handler.listen().await });
 
     let mock_consumer = consumer_channel

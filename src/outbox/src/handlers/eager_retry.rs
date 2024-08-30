@@ -1,5 +1,3 @@
-use cdc_framework::db::DbConfig;
-
 use crate::{client::OutboxClient, model::EventRecord};
 
 /// Retries handling of messages that failed to be processed.
@@ -19,11 +17,8 @@ impl<Inner> EagerRetryHandler<Inner>
 where
     Inner: cdc_framework::EventHandler<EventRecord>,
 {
-    pub async fn new(db_config: &DbConfig, inner: Inner) -> anyhow::Result<Self> {
-        Ok(Self {
-            client: OutboxClient::new(db_config).await?,
-            inner,
-        })
+    pub async fn new(client: OutboxClient, inner: Inner) -> anyhow::Result<Self> {
+        Ok(Self { client, inner })
     }
 }
 
