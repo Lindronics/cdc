@@ -9,6 +9,7 @@ cdc-framework = { path = "../cdc-framework" }
 
 hex = { workspace = true }
 postgres-replication = { workspace = true }
+tokio = { workspace = true }
 tokio-postgres = { workspace = true }
 uuid = { workspace = true }
 anyhow = { workspace = true }

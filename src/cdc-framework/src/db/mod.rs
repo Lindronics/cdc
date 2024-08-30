@@ -11,6 +11,7 @@ pub use model::Entity;
 
 pub struct DbClient<const REPLICATION: bool = false> {
     client: tokio_postgres::Client,
+    dbname: String,
 }
 
 impl<const REPLICATION: bool> DbClient<REPLICATION> {
@@ -21,7 +22,10 @@ impl<const REPLICATION: bool> DbClient<REPLICATION> {
                 .unwrap();
         tokio::spawn(connection);
 
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            dbname: config.dbname.clone(),
+        })
     }
 }
 

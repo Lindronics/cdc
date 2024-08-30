@@ -28,7 +28,7 @@ async fn main() {
     let consumer_channel = amqp_connection.create_channel().await.unwrap();
     setup_amqp(&consumer_channel).await;
 
-    let (outbox_client, mut handler) = outbox::new::<OrderEvent>(&config, &amqp_connection)
+    let (outbox_client, handler) = outbox::new::<OrderEvent>(&config, &amqp_connection)
         .await
         .unwrap();
     let _bg = tokio::spawn(async move { handler.listen().await });

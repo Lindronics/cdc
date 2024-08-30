@@ -3,4 +3,4 @@ mod publisher;
 mod subscriber;
 
 pub use publisher::Publisher;
-pub use subscriber::{handler::InsertHandler, Subscriber};
+pub use subscriber::{handler::EventHandler, Subscriber};

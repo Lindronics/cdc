@@ -22,7 +22,7 @@ impl<const REPLICATION: bool> super::DbClient<REPLICATION> {
         if !self.replication_slot_exists(T::TABLE).await? {
             self.simple_query(&format!(
                 r#"
-                CREATE_REPLICATION_SLOT {table}_slot 
+                CREATE_REPLICATION_SLOT {table}_slot
                 LOGICAL "pgoutput" NOEXPORT_SNAPSHOT;
                 "#,
                 table = T::TABLE
@@ -66,7 +66,13 @@ impl<const REPLICATION: bool> super::DbClient<REPLICATION> {
     async fn replication_slot_exists(&self, table: &str) -> anyhow::Result<bool> {
         let publications = self
             .simple_query(&format!(
-                "SELECT * FROM pg_replication_slots WHERE slot_name = '{table}_slot';"
+                r#"
+                SELECT *
+                FROM pg_replication_slots
+                WHERE slot_name = '{table}_slot'
+                AND database = '{db}';
+                "#,
+                db = self.dbname,
             ))
             .await?;
         Ok(publications

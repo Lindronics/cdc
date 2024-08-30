@@ -1,32 +1,32 @@
-use cdc_framework::{db::Entity, Subscriber};
+use cdc_framework::db::Entity;
 pub use cdc_framework::{
     db::{DbClient, DbConfig},
-    InsertHandler as EventHandler,
+    EventHandler,
 };
+use client::OutboxClient;
 use model::EventRecord;
+use subscriber::OutboxSubscriber;
 
 pub mod client;
 pub mod handlers;
 pub mod model;
+pub mod subscriber;
 
 pub async fn new<T>(
     db_config: &DbConfig,
     amqp_connection: &::amqp::Connection,
 ) -> anyhow::Result<(
-    client::OutboxClient,
-    Subscriber<EventRecord, impl EventHandler<model::EventRecord>>,
+    OutboxClient,
+    OutboxSubscriber<impl EventHandler<EventRecord>>,
 )>
 where
     T: model::Message + ::amqp::Publish + Send + Sync + 'static,
 {
-    let replication_client = DbClient::<true>::new(db_config).await?;
-    setup(&replication_client).await?;
-
     let amqp_publisher = handlers::AmqpPublisher::<T>::new(amqp_connection).await?;
-    let retry_handler = handlers::RetryHandler::new(db_config, amqp_publisher).await?;
+    let retry_handler = handlers::EagerRetryHandler::new(db_config, amqp_publisher).await?;
 
-    let sub = Subscriber::new(&replication_client, retry_handler).await?;
-    let client = client::OutboxClient::new(db_config).await?;
+    let sub = OutboxSubscriber::new(&db_config, retry_handler).await?;
+    let client = OutboxClient::new(db_config).await?;
     Ok((client, sub))
 }
 

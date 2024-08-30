@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct DbConfig {
     pub host: String,
     pub port: u16,

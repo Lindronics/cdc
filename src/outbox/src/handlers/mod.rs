@@ -1,5 +1,5 @@
 mod amqp;
-mod retry;
+mod eager_retry;
 
 pub use amqp::*;
-pub use retry::*;
+pub use eager_retry::*;

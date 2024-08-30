@@ -7,7 +7,7 @@ use std::{
 use anyhow::Context;
 use bytes::Bytes;
 use futures::{SinkExt, StreamExt};
-use handler::InsertHandler;
+use handler::EventHandler;
 use postgres_replication::protocol::{CommitBody, LogicalReplicationMessage, ReplicationMessage};
 use tokio_postgres::{types::PgLsn, SimpleQueryMessage};
 
@@ -15,7 +15,7 @@ use crate::db::{self, Entity};
 
 pub mod handler;
 
-pub struct Subscriber<T: Entity, H: InsertHandler<T>> {
+pub struct Subscriber<T: Entity, H: EventHandler<T>> {
     stream: Pin<Box<tokio_postgres::CopyBothDuplex<bytes::Bytes>>>,
     message_handler: Arc<H>,
     t: std::marker::PhantomData<T>,
@@ -24,7 +24,7 @@ pub struct Subscriber<T: Entity, H: InsertHandler<T>> {
 impl<T, H> Subscriber<T, H>
 where
     T: Entity,
-    H: InsertHandler<T> + Send + Sync + 'static,
+    H: EventHandler<T> + Send + Sync + 'static,
 {
     pub async fn new(db_client: &db::DbClient<true>, message_handler: H) -> anyhow::Result<Self> {
         db_client.setup::<T>().await?;
@@ -34,10 +34,10 @@ where
             .copy_both_simple::<bytes::Bytes>(
                 &(format!(
                     r#"
-                    START_REPLICATION SLOT {table}_slot 
-                    LOGICAL {lsn} 
+                    START_REPLICATION SLOT {table}_slot
+                    LOGICAL {lsn}
                     (
-                        "proto_version" '1', 
+                        "proto_version" '1',
                         "publication_names" '{table}_pub'
                     );
                     "#,

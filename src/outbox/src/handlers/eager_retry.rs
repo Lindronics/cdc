@@ -2,14 +2,22 @@ use cdc_framework::db::DbConfig;
 
 use crate::{client::OutboxClient, model::EventRecord};
 
-pub struct RetryHandler<Inner: cdc_framework::InsertHandler<EventRecord>> {
+/// Retries handling of messages that failed to be processed.
+///
+/// This is done by updating the TTL of the message,
+/// which will result in it reappearing in the stream.
+///
+/// We call this eager since there is no scheduled timeout before the next retry.
+///
+/// Wraps an inner handler.
+pub struct EagerRetryHandler<Inner: cdc_framework::EventHandler<EventRecord>> {
     client: OutboxClient,
     inner: Inner,
 }
 
-impl<Inner> RetryHandler<Inner>
+impl<Inner> EagerRetryHandler<Inner>
 where
-    Inner: cdc_framework::InsertHandler<EventRecord>,
+    Inner: cdc_framework::EventHandler<EventRecord>,
 {
     pub async fn new(db_config: &DbConfig, inner: Inner) -> anyhow::Result<Self> {
         Ok(Self {
@@ -19,9 +27,9 @@ where
     }
 }
 
-impl<Inner> cdc_framework::InsertHandler<EventRecord> for RetryHandler<Inner>
+impl<Inner> cdc_framework::EventHandler<EventRecord> for EagerRetryHandler<Inner>
 where
-    Inner: cdc_framework::InsertHandler<EventRecord> + Send + Sync,
+    Inner: cdc_framework::EventHandler<EventRecord> + Send + Sync,
 {
     async fn handle(&self, msg: EventRecord) -> anyhow::Result<()> {
         let id = msg.id;
