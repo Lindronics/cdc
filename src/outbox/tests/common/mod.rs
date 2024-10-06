@@ -1,12 +1,11 @@
 pub mod mock_handlers;
 pub mod test_event;
 
-use amqp::{Connection, ConnectionProperties};
 use futures::StreamExt;
 use lapin::{
     options::{BasicAckOptions, ExchangeDeclareOptions, QueueBindOptions, QueueDeclareOptions},
     types::FieldTable,
-    ExchangeKind,
+    Connection, ConnectionProperties, ExchangeKind,
 };
 use outbox::{setup, DbClient, DbConfig, ReplicationConfig};
 use rand::Rng;

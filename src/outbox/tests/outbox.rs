@@ -3,6 +3,7 @@ use std::sync::{
     Arc,
 };
 
+use amqp::AmqpPublisher;
 use lapin::{options::BasicConsumeOptions, types::FieldTable};
 
 mod common;
@@ -16,13 +17,21 @@ use outbox::{client::OutboxClient, handlers, subscriber::OutboxSubscriber};
 async fn outbox_works() {
     let context = TestContext::new().await;
 
-    let (client, sub) = outbox::new::<TestEvent>(
+    let client = OutboxClient::new(&context.db_config, &context.replication_config)
+        .await
+        .unwrap();
+    let amqp_publisher = AmqpPublisher::<TestEvent>::new(&context.amqp_connection)
+        .await
+        .unwrap();
+
+    let sub = OutboxSubscriber::new(
         &context.db_config,
         &context.replication_config,
-        &context.amqp_connection,
+        amqp_publisher,
     )
     .await
     .unwrap();
+
     let _bg = tokio::spawn(async move { sub.listen().await });
     let mock_consumer = context
         .amqp_connection
@@ -54,7 +63,7 @@ async fn error_gets_retried() {
     // Add a handler that fails until TTL is down to 1
     let total_attempts = Arc::new(AtomicU32::new(0));
     let handler = {
-        let amqp_publisher = handlers::AmqpPublisher::<TestEvent>::new(&context.amqp_connection)
+        let amqp_publisher = amqp::AmqpPublisher::<TestEvent>::new(&context.amqp_connection)
             .await
             .unwrap();
         let fallible_handler = mock_handlers::FallibleHandler {

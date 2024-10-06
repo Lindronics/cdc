@@ -64,7 +64,7 @@ impl outbox::model::Message for OrderEvent {
     }
 }
 
-impl outbox::handlers::Publish for OrderEvent {
+impl amqp::Publish for OrderEvent {
     fn exchange(&self) -> &str {
         EXCHANGE
     }
@@ -75,6 +75,10 @@ impl outbox::handlers::Publish for OrderEvent {
             OrderEventInner::Dispatched(_) => ORDER_DISPATCHED,
             OrderEventInner::Delivered(_) => ORDER_DELIVERED,
         }
+    }
+
+    fn properties(&self) -> amqp::BasicProperties {
+        lapin::BasicProperties::default()
     }
 
     fn payload(&self) -> std::borrow::Cow<'_, [u8]> {

@@ -26,7 +26,7 @@ where
         setup(&replication_client, &replication_config.table).await?;
 
         let inner = RwLock::new(
-            cdc_framework::Subscriber::new(&replication_client, &replication_config, handler)
+            cdc_framework::Subscriber::new(&replication_client, replication_config, handler)
                 .await?,
         );
 

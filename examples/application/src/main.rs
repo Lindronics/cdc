@@ -33,11 +33,18 @@ async fn main() {
     let consumer_channel = amqp_connection.create_channel().await.unwrap();
     setup_amqp(&consumer_channel).await;
 
-    let (outbox_client, handler) =
-        outbox::new::<OrderEvent>(&config, &replication_config, &amqp_connection)
+    let outbox_client = outbox::client::OutboxClient::new(&config, &replication_config)
+        .await
+        .unwrap();
+    let amqp_publisher = amqp::AmqpPublisher::<OrderEvent>::new(&amqp_connection)
+        .await
+        .unwrap();
+    let sub =
+        outbox::subscriber::OutboxSubscriber::new(&config, &replication_config, amqp_publisher)
             .await
             .unwrap();
-    let _bg = tokio::spawn(async move { handler.listen().await });
+
+    let _bg = tokio::spawn(async move { sub.listen().await });
 
     let mock_consumer = consumer_channel
         .basic_consume(

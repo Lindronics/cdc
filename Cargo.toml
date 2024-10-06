@@ -8,6 +8,11 @@ members = [
 ]
 
 [workspace.dependencies]
+# Local
+amqp = { path = "src/amqp" }
+cdc-framework = { path = "src/cdc-framework" }
+outbox = { path = "src/outbox" }
+
 lapin = { version = "2.5.0" }
 tokio = { version = "1.39.2", features = ["rt-multi-thread", "macros"] }
 postgres-replication = { git = "https://github.com/MaterializeInc/rust-postgres", rev = "37f1114" }

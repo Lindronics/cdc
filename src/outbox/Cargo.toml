@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-amqp = { path = "../amqp" }
-cdc-framework = { path = "../cdc-framework" }
+cdc-framework = { workspace = true }
 
 hex = { workspace = true }
 postgres-replication = { workspace = true }
@@ -15,6 +14,8 @@ uuid = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]
+amqp = { workspace = true }
+
 futures = { workspace = true }
 lapin = { workspace = true }
 rand = { workspace = true }

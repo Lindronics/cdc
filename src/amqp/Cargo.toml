@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+cdc-framework = { workspace = true }
+outbox = { workspace = true }
+
 anyhow = { workspace = true }
 lapin = { workspace = true }
 tokio = { workspace = true }

@@ -41,6 +41,10 @@ impl Publish for TestEvent {
         MOCK_ROUTING_KEY
     }
 
+    fn properties(&self) -> lapin::BasicProperties {
+        lapin::BasicProperties::default()
+    }
+
     fn payload(&self) -> std::borrow::Cow<'_, [u8]> {
         serde_json::to_vec(self).unwrap().into()
     }

@@ -14,6 +14,10 @@ impl Publish for TestMsg {
         "test-routing-key"
     }
 
+    fn properties(&self) -> lapin::BasicProperties {
+        lapin::BasicProperties::default()
+    }
+
     fn payload(&self) -> std::borrow::Cow<'_, [u8]> {
         self.0.as_bytes().into()
     }
@@ -38,6 +42,8 @@ async fn publish() {
         .await
         .unwrap();
 
-    let publisher = amqp::AmqpPublisher::new(&connection).await.unwrap();
+    let publisher = amqp::AmqpPublisher::<TestMsg>::new(&connection)
+        .await
+        .unwrap();
     publisher.publish(&msg).await.unwrap();
 }
