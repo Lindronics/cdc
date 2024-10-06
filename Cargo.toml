@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["src/cdc-framework", "src/application", "src/outbox", "src/amqp"]
+members = [
+    "examples/application",
+    "src/cdc-framework",
+    "src/outbox",
+    "src/amqp",
+]
 
 [workspace.dependencies]
 lapin = { version = "2.5.0" }
